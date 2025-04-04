@@ -9,7 +9,7 @@ const Product = require("../models/product.model");
 const moment = require("moment")
 
 router.post("/create-appointment", authenticateToken, async (req, res) => {
-  const { date, time, services, notes } = req.body;
+  const { date, time, services, note } = req.body;
   const { user } = req.user;
 
   if (!date) {
@@ -44,7 +44,7 @@ router.post("/create-appointment", authenticateToken, async (req, res) => {
       time,
       client: user._id,
       services,
-      notes: notes || "",
+      note: note || "",
     });
 
     await appointment.save();
@@ -74,7 +74,7 @@ router.get("/get-appointments", authenticateToken, async (req, res) => {
   try {
     const appointments = await Appointment.find()
       .populate("client", "fullName email phone")
-      .populate({path:"service", select:"serviceName duration price"})
+      .populate({path:"services", select:"serviceName duration price"})
       .populate("product", "productName price")
       .sort({ date: 1, time: 1 });
 
@@ -98,7 +98,7 @@ router.get("/get-appointment/:appointmentId", authenticateToken, async (req, res
   try {
     const appointment = await Appointment.findById(appointmentId)
       .populate("client", "fullName email phone")
-      .populate({path:"service", select:"serviceName duration price"})
+      .populate({path:"services", select:"serviceName duration price"})
       .populate("product", "productName price");
 
     if (!appointment) {
@@ -124,7 +124,7 @@ router.get("/get-appointment-by-user/:userId", authenticateToken, async (req, re
 
   try {
     const appointments = await Appointment.find({ client: userId })
-      .populate("service", "serviceName duration price")
+      .populate({path:"services", select:"serviceName duration price"})
       .populate("product", "productName price")
       .sort({ date: 1, time: 1 });
 
@@ -144,10 +144,10 @@ router.get("/get-appointment-by-user/:userId", authenticateToken, async (req, re
 
 router.put("/edit-appointment/:appointmentId", authenticateToken, async (req, res) => {
   const appointmentId = req.params.appointmentId;
-  const { date, time, services, notes, product } = req.body;
+  const { date, time, services, note, product } = req.body;
   const { user } = req.user;
 
-  if (!date && !time && services.length<1 && !notes && product === undefined) {
+  if (!date && !time && services.length<1 && !note && product === undefined) {
     return res.status(400).json({ error: true, message: "No changes provided" });
   }
 
@@ -188,7 +188,7 @@ router.put("/edit-appointment/:appointmentId", authenticateToken, async (req, re
 
     if (date) appointment.date = date;
     if (time) appointment.time = time;
-    if (notes !== undefined) appointment.notes = notes;
+    if (note !== undefined) appointment.note = note;
 
     await appointment.save();
 
