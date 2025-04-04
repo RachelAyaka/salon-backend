@@ -5,7 +5,7 @@ const aptSchema = new Schema({
     date: {type: Date},
     time: {type: String},
     client: {type: mongoose.Schema.Types.ObjectId, ref: 'User'},
-    service: {type: mongoose.Schema.Types.ObjectId, ref: 'Service'},
+    services: [{type: mongoose.Schema.Types.ObjectId, ref: 'Service'}],
     note: {type: String, default: ""},
     product: {type: mongoose.Schema.Types.ObjectId, ref: 'Product'}
 })
