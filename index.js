@@ -20,19 +20,19 @@ const express = require("express")
 const cors = require("cors")
 const app = express()
 
-app.use(express.json())
-
 app.use(
-    cors({
-        origin: process.env.NODE_ENV === 'production' 
-          ? 'https://salon-frontend-lilac.vercel.app/' 
-          : '*',
-        allowedHeaders: ['Content-Type', 'Authorization'],
-        credentials: true
-        ,
-        
-      })
+  cors({
+    origin: process.env.NODE_ENV === 'production' 
+    ? 'https://salon-frontend-lilac.vercel.app' 
+    : '*',
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+    ,
+    
+  })
 )
+
+app.use(express.json())
 
 app.get("/", (req, res) => {
     res.json({data: 'API is running'})
