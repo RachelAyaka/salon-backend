@@ -7,8 +7,7 @@ if (!connectionString) {
     console.error("MONGODB_URI not found in environment variables");
     process.exit(1);
   }
-  
-// Connect to MongoDB
+
 mongoose.connect(connectionString)
 .then(() => {
     console.log('MongoDB connected');
@@ -16,9 +15,6 @@ mongoose.connect(connectionString)
 .catch((err) => {
     console.error('MongoDB connection error:', err);
 })
-
-const User = require("./models/user.model")
-const Note = require("./models/note.model")
 
 const express = require("express")
 const cors = require("cors")
@@ -28,8 +24,11 @@ app.use(express.json())
 
 app.use(
     cors({
-        origin: "*",
-    })
+        origin: process.env.NODE_ENV === 'production' 
+          ? 'https://vercel.com/rachelayakas-projects/salon-frontend' 
+          : '*',
+        credentials: true
+      })
 )
 
 app.get("/", (req, res) => {
@@ -51,6 +50,9 @@ app.use("", serviceRoutes)
 const productRoutes = require("./routes/product.routes");
 app.use("", productRoutes)
 
-app.listen(8000)
+const PORT = process.env.PORT || 8000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
 module.exports = app
