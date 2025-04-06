@@ -6,7 +6,7 @@ const Appointment = require("../models/appointment.model");
 const User = require("../models/user.model");
 const Service = require("../models/service.model");
 const Product = require("../models/product.model");
-const moment = require("moment")
+const moment = require("moment-timezone")
 
 router.post("/create-appointment", authenticateToken, async (req, res) => {
   const { date, time, services, note } = req.body;
@@ -243,47 +243,126 @@ router.delete("/delete-appointment/:appointmentId", authenticateToken, async (re
   }
 });
 
-const getAvailableSlots = async (date, totalDuration) => {
-  const slots = [];
-  const startTime = moment(date).startOf('day');
-  const now = moment()
-  
-  for (let i = 8; i <= 18; i++) { // 8am to 6pm working hours
-    for (let j = 0; j < 60; j += 15) { // Step through the hours in 15 minute intervals
-      const slotStart = startTime.clone().hour(i).minute(j); // Create the start time for each 15-minute slot
-      const slotEnd = slotStart.clone().add(totalDuration, 'minutes'); // Add total duration to the start time
-
-      if (i==18 && j !== 0) {
-        continue
-      }
-      if (slotStart.isBefore(now)) {
-        continue
-      }
-
-      // Check if any appointments exist in this time range
-      const isSlotAvailable = await Appointment.find({
-        date: { $gte: slotStart.toDate(), $lt: slotEnd.toDate() }
-      }).exec();
-
-      // If no appointments are found in this time range, it's available
-      if (isSlotAvailable.length === 0) {
-        slots.push(slotStart.format("HH:mm")); // Store the available slot in "HH:mm" format
-      }
-    }
-  }
-
-  return slots;
-};
-
 router.get("/available-slots", async (req, res) => {
-  const {date, duration} = req.query
-
   try {
-    const availableSlots = await getAvailableSlots(date, parseInt(duration))
+    const { date, duration } = req.query;
+    
+    if (!date || !duration) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Date and duration are required" 
+      });
+    }
+    
+    // Parse the requested date
+    const requestedDate = moment.tz(date, "YYYY-MM-DD", "America/Los_Angeles");
+    const dayOfWeek = requestedDate.day(); // 0 is Sunday, 6 is Saturday
+    const now = moment().tz('America/Los_Angeles');
+    
+    let startHour, endHour;
+    if (dayOfWeek >= 1 && dayOfWeek <= 4) {
+      // Monday to Thursday
+      startHour = 15; // 3pm
+      endHour = 20;   // 8pm
+    } else {
+      // Friday, Saturday, Sunday
+      startHour = 8;  // 8am
+      endHour = 20;   // 8pm
+    }
+    
+    // Set start and end time for the day in PST
+    const startTime = requestedDate.clone().hour(startHour).minute(0).second(0);
+    const endTime = requestedDate.clone().hour(endHour).minute(0).second(0);
+    
+    // Create array of all potential time slots in 15-minute increments
+    const slots = [];
+    const slotDuration = 15; // 15-minute slots
+    let currentSlot = startTime.clone();
+    
+    while (currentSlot.isBefore(endTime)) {
+      // Calculate the end time for this potential appointment
+      const potentialEndTime = currentSlot.clone().add(parseInt(duration), 'minutes');
+      
+      // Only add the slot if the appointment would finish within operating hours
+      if (potentialEndTime.isSameOrBefore(endTime)) {
+        slots.push(currentSlot.format("h:mm A"));
+      }
+      
+      // Move to next 15-minute slot
+      currentSlot.add(slotDuration, 'minutes');
+    }
+    
+    // Find existing appointments for the requested date
+    const existingAppointments = await Appointment.find({ date })
+      .populate('services', 'duration')
+      .sort({ time: 1 });
+    
+    // Filter out unavailable slots
+    const availableSlots = slots.filter(slot => {
+      // Convert the slot time to moment object in PST
+      const slotTime = moment.tz(`${date} ${slot}`, "YYYY-MM-DD h:mm A", "America/Los_Angeles");
+
+      if (requestedDate.isSame(now, 'day') && slotTime.isSameOrBefore(now)) {
+        return false;
+      }
+      
+      // Calculate end time of potential appointment
+      const potentialEndTime = slotTime.clone().add(parseInt(duration), 'minutes');
+      
+      // Check if this slot overlaps with any existing appointments
+      for (const appointment of existingAppointments) {
+        // Calculate total duration of services for this appointment
+        let appointmentDuration = 0;
+        if (appointment.services && appointment.services.length > 0) {
+          appointmentDuration = appointment.services.reduce(
+            (total, service) => total + (service.duration || 0), 
+            0
+          );
+        }
+        
+        // Convert appointment time to moment object in PST
+        const appointmentTime = moment.tz(
+          `${date} ${appointment.time}`, 
+          "YYYY-MM-DD h:mm A", 
+          "America/Los_Angeles"
+        );
+        
+        // Calculate end time of existing appointment
+        const appointmentEndTime = appointmentTime.clone().add(appointmentDuration, 'minutes');
+        
+        // Check if the potential appointment overlaps with this existing appointment
+        // An overlap occurs if:
+        // - The potential appointment starts during an existing appointment
+        // - The potential appointment ends during an existing appointment
+        // - The potential appointment completely spans an existing appointment
+        if (
+          (slotTime.isSameOrAfter(appointmentTime) && slotTime.isBefore(appointmentEndTime)) ||
+          (potentialEndTime.isAfter(appointmentTime) && potentialEndTime.isSameOrBefore(appointmentEndTime)) ||
+          (slotTime.isBefore(appointmentTime) && potentialEndTime.isAfter(appointmentEndTime))
+        ) {
+          return false
+        }
+      }
+      
+      return true
+    });
+    
+    // res.status(200).json({
+    //   success: true,
+    //   slots: availableSlots,
+    //   operatingHours: {
+    //     start: startTime.format("h:mm A"),
+    //     end: endTime.format("h:mm A")
+    //   }
+    // });
     res.json({slots: availableSlots})
   } catch (error) {
-    res.status(500).json({error: "Failed to fetch available slots."})
+    console.error("Error fetching available slots:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "An error occurred while fetching available time slots" 
+    });
   }
-})
+});
 
 module.exports = router;
