@@ -25,9 +25,12 @@ app.use(express.json())
 app.use(
     cors({
         origin: process.env.NODE_ENV === 'production' 
-          ? 'https://vercel.com/rachelayakas-projects/salon-frontend' 
+          ? 'https://salon-frontend-lilac.vercel.app/' 
           : '*',
+        allowedHeaders: ['Content-Type', 'Authorization'],
         credentials: true
+        ,
+        
       })
 )
 
