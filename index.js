@@ -22,9 +22,10 @@ const app = express()
 
 app.use(
   cors({
-    origin: process.env.NODE_ENV === 'production' 
-    ? 'https://salon-frontend-lilac.vercel.app' 
-    : '*',
+    // origin: process.env.NODE_ENV === 'production' 
+    // ? 'https://salon-frontend-lilac.vercel.app' 
+    // : '*',
+    origin: "http://localhost:5173",
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
     ,
@@ -37,6 +38,9 @@ app.use(express.json())
 app.get("/", (req, res) => {
     res.json({data: 'API is running'})
 })
+
+const emailRoutes = require('./routes/email.routes')
+app.use("", emailRoutes)
 
 const userRoutes = require("./routes/user.routes")
 app.use("", userRoutes)
