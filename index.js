@@ -22,10 +22,10 @@ const app = express()
 
 app.use(
   cors({
-    origin: process.env.NODE_ENV === 'production' 
-    ? 'https://salon-frontend-lilac.vercel.app' 
-    : '*',
-    // origin: "http://localhost:5173",
+    // origin: process.env.NODE_ENV === 'production' 
+    // ? 'https://salon-frontend-lilac.vercel.app' 
+    // : '*',
+    origin: "http://localhost:5173",
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
     ,
